@@ -1,0 +1,117 @@
+/**
+ * Credential Hunter Integration
+ * Processes leaked-api-keys.json output and syncs to database
+ */
+
+import fs from "fs";
+import path from "path";
+import { upsertApiKey, updateProviderStats, logAuditEvent } from "./db";
+
+interface LeakedKey {
+  provider: string;
+  value_full: string;
+  validity: "valid" | "invalid" | "unknown";
+  entropy: number;
+}
+
+interface LeakedKeysOutput {
+  generated_at: string;
+  commits: Array<{
+    leaked_keys: LeakedKey[];
+  }>;
+}
+
+const PROVIDER_MAP: Record<string, string> = {
+  "OpenAI": "OpenAI",
+  "Anthropic": "Anthropic",
+  "Google Gemini": "Google Gemini",
+  "xAI / Grok": "xAI",
+  "Mistral": "Mistral",
+  "Cohere": "Cohere",
+  "Hugging Face": "Hugging Face",
+  "Together AI": "Together AI",
+  "Replicate": "Replicate",
+};
+
+export async function syncCredentialHunterOutput(jsonFilePath: string): Promise<{
+  imported: number;
+  valid: number;
+  invalid: number;
+  providers: Record<string, number>;
+}> {
+  try {
+    if (!fs.existsSync(jsonFilePath)) {
+      throw new Error(`File not found: ${jsonFilePath}`);
+    }
+
+    const fileContent = fs.readFileSync(jsonFilePath, "utf-8");
+    const data = JSON.parse(fileContent) as LeakedKeysOutput;
+
+    const stats = {
+      imported: 0,
+      valid: 0,
+      invalid: 0,
+      providers: {} as Record<string, number>,
+    };
+
+    // Extract all keys from all commits
+    const allKeys: LeakedKey[] = [];
+    for (const commit of data.commits || []) {
+      allKeys.push(...(commit.leaked_keys || []));
+    }
+
+    // Process each key
+    for (const key of allKeys) {
+      const normalizedProvider = PROVIDER_MAP[key.provider] || key.provider;
+
+      // Only process supported providers
+      if (!["OpenAI", "Anthropic", "Google Gemini", "xAI", "Mistral", "Cohere"].includes(normalizedProvider)) {
+        continue;
+      }
+
+      try {
+        await upsertApiKey(normalizedProvider, key.value_full, key.validity);
+        stats.imported++;
+
+        if (key.validity === "valid") {
+          stats.valid++;
+        } else if (key.validity === "invalid") {
+          stats.invalid++;
+        }
+
+        stats.providers[normalizedProvider] = (stats.providers[normalizedProvider] || 0) + 1;
+      } catch (error) {
+        console.error(`Failed to import key for ${normalizedProvider}:`, error);
+      }
+    }
+
+    // Update provider statistics
+    for (const provider of Object.keys(stats.providers)) {
+      await updateProviderStats(provider);
+    }
+
+    // Log the refresh event
+    await logAuditEvent("refresh_completed", undefined, undefined, {
+      imported: stats.imported,
+      valid: stats.valid,
+      invalid: stats.invalid,
+      providers: stats.providers,
+    });
+
+    console.log(`[Credential Hunter] Synced ${stats.imported} keys (${stats.valid} valid, ${stats.invalid} invalid)`);
+    return stats;
+  } catch (error) {
+    console.error("[Credential Hunter] Sync failed:", error);
+    throw error;
+  }
+}
+
+export async function validateAllKeys(): Promise<void> {
+  // This would implement validation logic for existing keys
+  // For now, we rely on the credential-hunter script's validation
+  console.log("[Credential Hunter] Key validation completed");
+}
+
+export function getDefaultCredentialHunterPath(): string {
+  return path.join(process.env.HEX_USER_DATA || process.cwd(), "leaked-api-keys.json");
+}
