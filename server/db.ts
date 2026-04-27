@@ -1,11 +1,11 @@
 import { eq, sql, and, desc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/planetscale-serverless";
-import { Client } from "@planetscale/database";
+import { drizzle } from "drizzle-orm/tidb-serverless";
+import { connect } from "@tidbcloud/serverless";
 import { InsertUser, users, apiKeys, auditLogs, providerStats } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
-let client: Client | null = null;
+let client: any = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -13,9 +13,7 @@ export async function getDb() {
   if (!_db && dbUrl) {
     try {
       if (!client) {
-        client = new Client({
-          url: dbUrl,
-        });
+        client = connect({ url: dbUrl });
       }
       _db = drizzle(client);
     } catch (error) {
