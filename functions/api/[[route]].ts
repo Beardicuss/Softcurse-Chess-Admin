@@ -22,44 +22,7 @@ app.use('*', async (c, next) => {
 
 app.use('*', cors());
 
-app.get('/oauth/callback', async (c) => {
-    const code = c.req.query('code');
-    const state = c.req.query('state');
-
-    if (!code || !state) {
-        return c.json({ error: 'code and state are required' }, 400);
-    }
-
-    try {
-        const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-        const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-
-        if (!userInfo.openId) {
-            return c.json({ error: 'openId missing from user info' }, 400);
-        }
-
-        await upsertUser({
-            openId: userInfo.openId,
-            name: userInfo.name || null,
-            email: userInfo.email ?? null,
-            loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-            lastSignedIn: new Date(),
-        });
-
-        const sessionToken = await sdk.createSessionToken(userInfo.openId, {
-            name: userInfo.name || '',
-            expiresInMs: ONE_YEAR_MS,
-        });
-
-        const cookieOptions = getSessionCookieOptions(c.req.raw as any);
-        setCookie(c, COOKIE_NAME, sessionToken, { ...(cookieOptions as any), maxAge: ONE_YEAR_MS / 1000 });
-
-        return c.redirect('/');
-    } catch (error) {
-        console.error('[OAuth] Callback failed', error);
-        return c.json({ error: 'OAuth callback failed' }, 500);
-    }
-});
+// OAuth has been stripped out. Auth is purely handled by TRPC password validation now.
 
 // Raw Endpoint for Chess AI
 app.post('/chess-ai', async (c) => {
