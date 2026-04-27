@@ -11,6 +11,7 @@ export const getEnvVar = (key: string) => {
 export const ENV = {
   get appId() { return getEnvVar("VITE_APP_ID") ?? ""; },
   get cookieSecret() { return getEnvVar("JWT_SECRET") ?? ""; },
+  get adminPassword() { return getEnvVar("ADMIN_PASSWORD") ?? ""; },
   get databaseUrl() { return getEnvVar("DATABASE_URL") ?? ""; },
   get oAuthServerUrl() { return getEnvVar("OAUTH_SERVER_URL") ?? ""; },
   get ownerOpenId() { return getEnvVar("OWNER_OPEN_ID") ?? ""; },

@@ -15,9 +15,25 @@ import {
 } from "./db";
 import { TRPCError } from "@trpc/server";
 import { validateKeyForProvider } from "./keyValidator";
+import { ENV } from "./_core/env";
+import { sdk } from "./_core/sdk";
 
 export const appRouter = router({
   auth: router({
+    login: publicProcedure
+      .input(z.object({ password: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        if (!ENV.adminPassword) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "System is not configured. Missing ADMIN_PASSWORD edge variable." });
+        }
+        if (input.password !== ENV.adminPassword) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid access credentials" });
+        }
+        const token = await sdk.createSessionToken("local_admin", { name: "System Administrator" });
+        const cookieStr = `${COOKIE_NAME}=${token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax; Secure`;
+        ctx.resHeaders.append('Set-Cookie', cookieStr);
+        return { success: true };
+      }),
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       ctx.resHeaders.append('Set-Cookie', `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax;`);

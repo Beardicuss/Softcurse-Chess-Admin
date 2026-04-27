@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Loader2, RefreshCw, AlertCircle, CheckCircle, Clock, Plus, Edit2 } from "lucide-react";
+import { Loader2, RefreshCw, AlertCircle, CheckCircle, Clock, Plus, Edit2, Lock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -11,7 +11,18 @@ import { Button } from "@/components/ui/button";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuth();
+  const [password, setPassword] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+
+  const loginMutation = trpc.auth.login.useMutation({
+    onSuccess: () => {
+      toast.success("SYSTEM ACCESS GRANTED");
+      window.location.reload();
+    },
+    onError: (err) => {
+      toast.error(`ACCESS DENIED: ${err.message}`);
+    }
+  });
 
   const [addKeyProvider, setAddKeyProvider] = useState("");
   const [addKeyValue, setAddKeyValue] = useState("");
@@ -79,10 +90,28 @@ export default function AdminDashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 relative">
         <div className="glow-bloom" />
-        <div className="glass-panel p-10 max-w-md w-full text-center relative z-10 border-[var(--c-magenta)]">
-          <h1 className="hero-text text-[var(--c-magenta)] text-shadow-glow-magenta">ACCESS DENIED</h1>
-          <div className="divider" />
-          <p className="data-text data-magenta mb-4">RESTRICTED: SYS_ADMIN_ONLY</p>
+        <div className="glass-panel p-10 max-w-md w-full text-center relative z-10 border-[var(--c-cyan)]">
+          <Lock className="h-12 w-12 text-[var(--c-cyan)] mx-auto mb-4" />
+          <h1 className="hero-text text-[var(--c-cyan)] text-shadow-glow-cyan text-3xl">SYSTEM LOGIN</h1>
+          <div className="divider my-4" />
+          <p className="data-text data-cyan mb-6 tracking-widest text-sm">AUTHENTICATION REQUIRED</p>
+          <div className="flex flex-col gap-4">
+            <Input
+              type="password"
+              placeholder="ENTER SECURE KEY"
+              className="glass-panel text-center text-xl tracking-[0.2em] font-mono data-text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && loginMutation.mutate({ password })}
+            />
+            <Button
+              className="w-full bg-[var(--c-cyan)] text-black hover:bg-black hover:text-[var(--c-cyan)] hover:border-[var(--c-cyan)] border border-transparent transition-all duration-300 font-mono tracking-widest text-md h-12"
+              onClick={() => loginMutation.mutate({ password })}
+              disabled={loginMutation.isPending || !password}
+            >
+              {loginMutation.isPending ? <Loader2 className="animate-spin h-5 w-5" /> : "[ DECRYPT / ENTER ]"}
+            </Button>
+          </div>
         </div>
       </div>
     );
