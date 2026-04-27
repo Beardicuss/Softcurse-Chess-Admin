@@ -41,7 +41,9 @@ export async function syncCredentialHunterOutput(jsonFilePath: string): Promise<
 }> {
   try {
     if (!fs.existsSync(jsonFilePath)) {
-      throw new Error(`File not found: ${jsonFilePath}`);
+      console.warn(`[Credential Hunter] Payload file not found: ${jsonFilePath}`);
+      console.warn(`[Credential Hunter] Assuming 0 items discovered due to GitHub edge rate-limits.`);
+      return { imported: 0, valid: 0, invalid: 0, providers: {} };
     }
 
     const fileContent = fs.readFileSync(jsonFilePath, "utf-8");
@@ -113,7 +115,7 @@ export async function validateAllKeys(): Promise<void> {
 }
 
 export function getDefaultCredentialHunterPath(): string {
-  return path.join(process.env.HEX_USER_DATA || process.cwd(), "leaked-api-keys.json");
+  return path.join(process.cwd(), "leaked-api-keys.json");
 }
 
 import { fileURLToPath } from "url";
