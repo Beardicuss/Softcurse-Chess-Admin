@@ -1,4 +1,4 @@
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/planetscale-serverless";
 import { Client } from "@planetscale/database";
 import { InsertUser, users, apiKeys, auditLogs, providerStats } from "../drizzle/schema";
@@ -230,6 +230,12 @@ export async function logAuditEvent(
     keyId,
     details: details ? JSON.stringify(details) : null,
   });
+}
+
+export async function getAuditLogs() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(auditLogs).orderBy(desc(auditLogs.createdAt)).limit(100);
 }
 
 function maskApiKey(key: string): string {

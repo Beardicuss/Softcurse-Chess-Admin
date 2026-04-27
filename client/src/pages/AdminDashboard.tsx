@@ -3,6 +3,7 @@ import { Loader2, RefreshCw, AlertCircle, CheckCircle, Clock, Plus, Edit2 } from
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Link } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -65,6 +66,15 @@ export default function AdminDashboard() {
     onError: (error) => { toast.error(`Failed to update key: ${error.message}`); },
   });
 
+  const addProviderMutation = trpc.chessAI.addProvider.useMutation({
+    onSuccess: () => {
+      toast.success("Provider initialized successfully");
+      refetchStats();
+      setAddKeyProvider("");
+    },
+    onError: (error) => { toast.error(`Failed to initialize provider: ${error.message}`); },
+  });
+
   if (!isAuthenticated || user?.role !== "admin") {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 relative">
@@ -82,13 +92,44 @@ export default function AdminDashboard() {
     <div className="min-h-screen p-8 relative">
       <div className="glow-bloom" />
       <div className="max-w-6xl mx-auto space-y-8 relative z-10">
-        <div className="glass-panel p-6">
-          <h1 className="hero-text text-4xl mb-2">
-            <span className="decorator"></span>AI KEY POOL MANAGER
-          </h1>
-          <p className="data-text font-mono text-[var(--c-cyan-dim)] text-sm tracking-widest uppercase">
-            MONITOR AND MANAGE API KEYS ACROSS ALL NODES
-          </p>
+        <div className="glass-panel p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <h1 className="hero-text text-4xl mb-2">
+              <span className="decorator"></span>AI KEY POOL MANAGER
+            </h1>
+            <p className="data-text font-mono text-[var(--c-cyan-dim)] text-sm tracking-widest uppercase">
+              MONITOR AND MANAGE API KEYS ACROSS ALL NODES
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="h-10 border-[var(--c-orange)] text-[var(--c-orange)] hover:bg-[var(--c-orange)] hover:text-black">
+                  <Plus className="h-4 w-4 mr-2" /> NEW PROVIDER
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="glass-panel border-[var(--c-orange)] bg-[var(--c-bg)]">
+                <DialogHeader>
+                  <DialogTitle className="data-text text-[var(--c-orange)] tracking-widest uppercase">INITIALIZE NEW PROVIDER</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4 py-4 mt-2">
+                  <Input placeholder="Provider ID (e.g. Anthropic)" className="glass-panel text-[var(--c-text)] data-text" value={addKeyProvider} onChange={e => setAddKeyProvider(e.target.value)} />
+                  <Button
+                    className="w-full bg-[var(--c-orange)] text-black hover:bg-[#ff8f59] hover:shadow-[0_0_15px_rgba(255,107,53,0.4)] mt-2 cursor-pointer font-mono tracking-widest duration-300 transition-all border border-transparent"
+                    onClick={() => addProviderMutation.mutate({ provider: addKeyProvider })}
+                    disabled={addProviderMutation.isPending || !addKeyProvider}
+                  >
+                    {addProviderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "[ ESTABLISH LINK ]"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Link href="/admin/audit">
+              <a className="data-text text-[var(--c-cyan)] border border-[var(--c-cyan)] px-4 py-2 hover:bg-[var(--c-cyan)] hover:text-black transition-colors duration-300 uppercase tracking-widest text-xs flex items-center h-10">
+                AUDIT LOGS
+              </a>
+            </Link>
+          </div>
         </div>
 
         {/* Fallback Chain Display */}
@@ -135,8 +176,8 @@ export default function AdminDashboard() {
                 <div key={provider} className="flex items-center gap-2 font-mono text-sm data-text">
                   <div
                     className={`px-3 py-1 border transition-all ${provider === statusData.currentProvider
-                        ? "border-[var(--c-orange)] text-[var(--c-orange)] shadow-[0_0_8px_rgba(255,107,53,0.4)]"
-                        : "border-[var(--c-border)] text-[var(--c-cyan-dim)]"
+                      ? "border-[var(--c-orange)] text-[var(--c-orange)] shadow-[0_0_8px_rgba(255,107,53,0.4)]"
+                      : "border-[var(--c-border)] text-[var(--c-cyan-dim)]"
                       }`}
                   >
                     {provider}

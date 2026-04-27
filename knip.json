@@ -1,0 +1,23 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "entry": [
+        "functions/api/[[route]].ts",
+        "client/src/main.tsx",
+        "client/src/App.tsx",
+        "scripts/credential-hunter.cjs",
+        "server/credentialHunterIntegration.ts"
+    ],
+    "project": [
+        "client/src/**/*.{ts,tsx}",
+        "server/**/*.{ts,tsx}",
+        "scripts/**/*.cjs"
+    ],
+    "ignore": [
+        "drizzle/meta/**"
+    ],
+    "ignoreDependencies": [
+        "hono",
+        "@hono/trpc-server",
+        "@tailwindcss/vite"
+    ]
+}

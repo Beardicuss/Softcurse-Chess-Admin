@@ -10,6 +10,8 @@ import {
   upsertApiKey,
   logAuditEvent,
   updateKeyById,
+  updateProviderStats,
+  getAuditLogs,
 } from "./db";
 import { TRPCError } from "@trpc/server";
 import { validateKeyForProvider } from "./keyValidator";
@@ -155,6 +157,19 @@ export const appRouter = router({
         await logAuditEvent("key_edited_manually", input.provider, input.id, { updates: input });
         return { success: true };
       }),
+
+    addProvider: protectedProcedure
+      .input(z.object({ provider: z.string().min(1) }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        await updateProviderStats(input.provider);
+        return { success: true };
+      }),
+
+    getAuditLogs: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return await getAuditLogs();
+    }),
   }),
 });
 
