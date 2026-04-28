@@ -99,7 +99,7 @@ export default function AdminDashboard() {
           <div className="flex flex-col gap-4">
             <Input
               type="password"
-              placeholder="ENTER SECURE KEY"
+              placeholder="ENTER VAULT KEY"
               className="glass-panel text-center text-xl tracking-[0.2em] font-mono data-text"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -110,7 +110,7 @@ export default function AdminDashboard() {
               onClick={() => loginMutation.mutate({ password })}
               disabled={loginMutation.isPending || !password}
             >
-              {loginMutation.isPending ? <Loader2 className="animate-spin h-5 w-5" /> : "[ DECRYPT / ENTER ]"}
+              {loginMutation.isPending ? <Loader2 className="animate-spin h-5 w-5" /> : "ACCESS VAULT"}
             </Button>
           </div>
         </div>
