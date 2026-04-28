@@ -40,10 +40,49 @@ const DIFFICULTY_LEVELS = [
   { id: "medium",    label: "Medium (Minimax Depth 4)" },
   { id: "hard",      label: "Hard (Minimax Depth 6)" },
   { id: "neural_ai", label: "Neural AI (Cloud Providers)" },
+  { id: "ai_vs_ai",  label: "AI vs AI (Spectator Mode)" },
 ];
 ```
 
-### 2. Call the Proxy
+### 2. AI vs AI — Spectator Mode
+
+When the player selects "AI vs AI", both sides are played by Neural AI automatically. The player watches the game unfold in real-time.
+
+```javascript
+async function runAIvsAILoop(game, board, delay = 2000) {
+  while (!game.isGameOver()) {
+    const fen = game.fen();
+    const history = game.history();
+
+    try {
+      const move = await getNeuralAIMove(fen, history);
+      game.move(move);
+      board.position(game.fen()); // update the 3D board
+    } catch (error) {
+      console.error("AI vs AI: provider chain exhausted, stopping game");
+      break;
+    }
+
+    // Pause between moves so the spectator can follow
+    await new Promise(r => setTimeout(r, delay));
+  }
+
+  if (game.isCheckmate()) console.log("Checkmate!");
+  if (game.isDraw()) console.log("Draw!");
+}
+
+// Start when player picks AI vs AI
+if (difficulty === "ai_vs_ai") {
+  runAIvsAILoop(game, board, 2000);
+}
+```
+
+Key behaviors:
+- **Turn delay**: 2 second pause between moves (configurable)
+- **Auto-stop**: Halts on checkmate, stalemate, draw, or provider failure
+- **No player input**: Board interaction is disabled during spectator mode
+
+### 3. Call the Proxy
 
 When the player selects Neural AI, send the current position to the proxy instead of running local minimax:
 
