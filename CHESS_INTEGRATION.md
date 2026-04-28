@@ -1,250 +1,211 @@
-# Chess Game Neural AI Integration Guide
+# Chess Game — Neural AI Integration Guide
 
-This document explains how to integrate the Neural AI difficulty mode into your chess game frontend.
+How to connect **Softcurse's Chess** to the live AI proxy so the game can generate real moves using cloud AI providers.
 
-## Overview
+## Architecture
 
-The chess-ai-proxy system provides a `/api/chess-ai` endpoint and tRPC procedures that power a "Neural AI" difficulty mode. This mode uses a fallback chain of real AI providers (OpenAI, Anthropic, Google Gemini, xAI, Mistral, Cohere) to generate chess moves.
+```
+┌─────────────────────┐       ┌──────────────────────────────────┐       ┌─────────────┐
+│  Softcurse's Chess   │──────▶│  chess-admin.pages.dev/api/trpc  │──────▶│   TiDB Cloud │
+│  (Three.js Frontend) │  HTTP │  (Cloudflare Edge Functions)     │  SQL  │   (Key Pool) │
+└─────────────────────┘       └──────────────────────────────────┘       └─────────────┘
+                                         │
+                                         │ Fallback Chain
+                                         ▼
+                              ┌──────────────────────┐
+                              │  1. Google Gemini     │
+                              │  2. Grok (Groq Cloud) │
+                              │  3. OpenRouter        │
+                              │  4. Anthropic         │
+                              │  5. OpenAI            │
+                              │  6. xAI               │
+                              │  7. Mistral           │
+                              │  8. Cohere            │
+                              └──────────────────────┘
+```
+
+**How it works:** The chess game sends the board position (FEN) to the proxy. The proxy picks the first provider with a valid key, asks it for the best move, and returns it. If a provider fails, it instantly falls back to the next one in the chain.
+
+---
 
 ## Integration Steps
 
-### 1. Add Neural AI to Difficulty Selection
+### 1. Add Neural AI Difficulty
 
-In your chess game UI (e.g., `ChessUI.jsx` or similar), add "Neural AI" to the difficulty options:
-not always avaible all keys so need a smart fallback system.
+In your chess game UI, add "Neural AI" as a difficulty option alongside the existing minimax levels:
 
 ```jsx
 const DIFFICULTY_LEVELS = [
-  { id: "easy", label: "Easy (Minimax Depth 2)" },
-  { id: "medium", label: "Medium (Minimax Depth 4)" },
-  { id: "hard", label: "Hard (Minimax Depth 6)" },
-  { id: "Neural AI", label: "Neural AI (Real AI Providers)" }, // NEW
+  { id: "easy",      label: "Easy (Minimax Depth 2)" },
+  { id: "medium",    label: "Medium (Minimax Depth 4)" },
+  { id: "hard",      label: "Hard (Minimax Depth 6)" },
+  { id: "neural_ai", label: "Neural AI (Cloud Providers)" },
 ];
 ```
 
-### 2. Update AI Engine Selection
+### 2. Call the Proxy
 
-In your `aiEngine.js` or AI selection logic, add a case for "Neural AI":
+When the player selects Neural AI, send the current position to the proxy instead of running local minimax:
+
+```javascript
+const PROXY_URL = "https://chess-admin.pages.dev";
+
+async function getNeuralAIMove(fen, moveHistory) {
+  const response = await fetch(`${PROXY_URL}/api/trpc/chessAI.getMove`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      json: { fen, moveHistory }
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Proxy error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const result = data.result.data.json;
+
+  console.log(`Neural AI (${result.provider}): ${result.move}`);
+  return result.move; // e.g. "e2e4", "Nf3"
+}
+```
+
+### 3. Wire It Into Your AI Engine
 
 ```javascript
 export async function getAIMove(fen, moveHistory, difficulty) {
-  if (difficulty === "Neural AI") {
-    return getNeuralAIMove(fen, moveHistory);
-  }
-  // ... existing minimax logic for other difficulties
-}
-
-async function getNeuralAIMove(fen, moveHistory) {
-  try {
-    const response = await fetch("/api/chess-ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fen, moveHistory }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`AI endpoint failed: ${response.statusText}`);
+  if (difficulty === "neural_ai") {
+    try {
+      return await getNeuralAIMove(fen, moveHistory);
+    } catch (error) {
+      console.warn("Neural AI failed, falling back to minimax:", error);
+      return getMinimaxMove(fen, 4); // graceful fallback
     }
-
-    const data = await response.json();
-    console.log(`Neural AI (${data.provider}): ${data.move}`);
-    return data.move;
-  } catch (error) {
-    console.error("Neural AI failed, falling back to minimax:", error);
-    // Fallback to minimax if Neural AI fails
-    return getMiniaxMove(fen, 4);
   }
+  // existing minimax logic for easy/medium/hard
+  return getMinimaxMove(fen, depthForDifficulty(difficulty));
 }
 ```
 
-### 3. Update Game State Management
+### 4. Add Loading State
 
-When the player selects "Neural AI" difficulty, ensure the game properly waits for the AI response:
-
-```jsx
-const handleDifficultySelect = async (difficulty) => {
-  setDifficulty(difficulty);
-  setGameStarted(true);
-  
-  if (difficulty === "Neural AI") {
-    // Show a loading indicator
-    setIsAIThinking(true);
-  }
-};
-
-const handleAIMove = async () => {
-  try {
-    setIsAIThinking(true);
-    const move = await getAIMove(currentFEN, moveHistory, difficulty);
-    // Apply move to board
-    applyMove(move);
-  } catch (error) {
-    console.error("AI move failed:", error);
-    // Handle error gracefully
-  } finally {
-    setIsAIThinking(false);
-  }
-};
-```
-
-### 4. Add Loading State UI
-
-Show the user which AI provider is being used:
+Neural AI moves take 1–5 seconds depending on the provider. Show a thinking indicator:
 
 ```jsx
-{isAIThinking && difficulty === "Neural AI" && (
-  <div className="ai-status">
+{isAIThinking && difficulty === "neural_ai" && (
+  <div className="ai-thinking-overlay">
     <Spinner />
-    <p>Neural AI is thinking...</p>
-    <p className="provider-info">Using {currentProvider}</p>
+    <p>Neural AI is analyzing the position...</p>
   </div>
 )}
 ```
 
-## API Endpoints
+---
 
-### POST /api/chess-ai
+## API Reference
 
-Generate the best move for a given position.
+### `POST /api/trpc/chessAI.getMove`
+
+Generate the best move for a board position.
 
 **Request:**
 ```json
 {
-  "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-  "moveHistory": ["e2e4", "c7c5"]
+  "json": {
+    "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1",
+    "moveHistory": ["e2e4"]
+  }
 }
 ```
 
 **Response:**
 ```json
 {
-  "move": "g1f3",
-  "provider": "OpenAI",
-  "confidence": 0.95
+  "result": {
+    "data": {
+      "json": {
+        "move": "c7c5",
+        "provider": "Google Gemini",
+        "confidence": 0.95
+      }
+    }
+  }
 }
 ```
 
-### GET /api/chess-ai/status
+### `GET /api/trpc/chessAI.getStatus`
 
-Get the current AI provider status and key pool information.
+Check which provider is active and the full fallback chain.
 
 **Response:**
 ```json
 {
-  "currentProvider": "OpenAI",
-  "providerChain": ["OpenAI", "Anthropic", "Google Gemini", "xAI", "Mistral", "Cohere"],
-  "lastTestMove": "e2e4",
-  "status": "operational"
+  "result": {
+    "data": {
+      "json": {
+        "currentProvider": "Google Gemini",
+        "providerChain": ["Google Gemini", "Grok", "OpenRouter", "Anthropic", "OpenAI", "xAI", "Mistral", "Cohere"],
+        "stats": [...]
+      }
+    }
+  }
 }
 ```
 
-## tRPC Integration (Alternative)
+---
 
-If using React with tRPC, you can call the procedures directly:
+## Provider Fallback Chain
 
-```tsx
-import { trpc } from "@/lib/trpc";
+| Priority | Provider           | Model                      | Speed   |
+|----------|--------------------|-----------------------------|---------|
+| 1        | **Google Gemini**  | Gemini 1.5 Flash            | ~1s     |
+| 2        | **Grok**           | Llama 3.3 70B (Groq Cloud)  | ~0.5s   |
+| 3        | **OpenRouter**     | Gemini 2.0 Flash            | ~1s     |
+| 4        | **Anthropic**      | Claude 3.5 Sonnet           | ~2s     |
+| 5        | **OpenAI**         | GPT-4o Mini                 | ~2s     |
+| 6        | **xAI**            | Grok Beta                   | ~2s     |
+| 7        | **Mistral**        | Mistral Small               | ~1.5s   |
+| 8        | **Cohere**         | Command Light               | ~1s     |
 
-function ChessGame() {
-  const getMovesMutation = trpc.chessAI.getMove.useMutation();
-  const statusQuery = trpc.chessAI.getStatus.useQuery();
+If all 8 providers fail, the `getMove` endpoint throws an error. Your game should catch this and fall back to local minimax.
 
-  const handleNeuralAIMove = async () => {
-    const response = await getMovesMutation.mutateAsync({
-      fen: currentFEN,
-      moveHistory,
-    });
-    console.log(`Move: ${response.move} from ${response.provider}`);
-  };
+---
 
-  return (
-    <div>
-      {statusQuery.data && (
-        <p>Current Provider: {statusQuery.data.currentProvider}</p>
-      )}
-      <button onClick={handleNeuralAIMove} disabled={getMovesMutation.isPending}>
-        {getMovesMutation.isPending ? "AI Thinking..." : "Get Neural AI Move"}
-      </button>
-    </div>
-  );
-}
-```
+## Key Management
+
+Keys come from two sources:
+
+1. **Credential Hunter** — Automated GitHub Action that scrapes publicly leaked API keys from GitHub commits every 12 hours and syncs them into TiDB.
+2. **Manual injection** — Add your own keys via the admin dashboard at `chess-admin.pages.dev/admin`.
+
+The system automatically rotates through available valid keys per provider to distribute load and handle rate limits.
+
+---
 
 ## Admin Dashboard
 
-Access the admin dashboard at `/admin/keys` to:
+Access at **`https://chess-admin.pages.dev/admin`** (password-protected):
 
-- View the key pool status for each provider
-- See valid key counts and last refresh times
-- Manually validate keys
-- Trigger batch validation for a provider
+- **Provider cards** — View valid/total key counts, request stats, last sync time
+- **Fallback chain** — Visual display of the active provider order
+- **Key management** — Add, edit, validate individual keys
+- **Batch validation** — Run diagnostics on all keys for a provider
+- **Audit logs** — Track key usage, fallback events, and sync history
 
-## Fallback Chain
+---
 
-The Neural AI system automatically falls back through this chain if a provider fails:
+## CORS Configuration
 
-1. **OpenAI** - GPT-4o Mini
-2. **Anthropic** - Claude 3.5 Sonnet
-3. **Google Gemini** - Gemini 1.5 Flash
-4. **xAI** - Grok Beta
-5. **Mistral** - Mistral Small
-6. **Cohere** - Command Light
+If your chess game runs on a different domain, you may need to configure CORS. The proxy currently allows all origins (`Access-Control-Allow-Origin: *`). For production, restrict this to your game's domain in `functions/api/[[route]].ts`.
 
-If all providers fail, the system returns an error and your game should fall back to minimax.
-
-## Key Rotation
-
-The system automatically rotates through available keys for each provider to distribute load and handle rate limits. This is transparent to the frontend.
-
-## Monitoring
-
-Check the audit logs in the database to track:
-
-- Key usage patterns
-- Provider fallback events
-- Validation results
-- Refresh cycles
+---
 
 ## Troubleshooting
 
-### "All AI providers failed"
-
-This means either:
-1. No valid keys are available for any provider
-2. All providers are rate-limited or experiencing issues
-3. The credential-hunter script hasn't run yet (runs every 12 hours)
-
-**Solution:** 
-- Check the admin dashboard to see key pool status
-- Manually trigger key validation from the admin dashboard
-- Check the audit logs for error details
-
-### High Latency
-
-Neural AI moves may take 2-5 seconds depending on provider load. Consider:
-- Adding a loading indicator
-- Setting a timeout (e.g., 10 seconds) and falling back to minimax
-- Using the easier difficulty levels for faster responses
-
-### Rate Limiting
-
-If you see "rate_limited" status for keys:
-- The system will automatically rotate to other keys
-- Wait 1-2 hours for the rate limit to reset
-- The credential-hunter script will mark the key as invalid after multiple failures
-
-## Performance Tips
-
-1. **Cache FEN positions** - Don't request moves for the same position twice
-2. **Use move history** - Provide the full move history for better context
-3. **Set timeouts** - Don't wait indefinitely for AI responses
-4. **Fallback gracefully** - Always have a fallback to minimax or random moves
-5. **Batch validate keys** - Run key validation during off-peak hours
-
-## Support
-
-For issues or questions:
-1. Check the admin dashboard for key pool status
-2. Review the audit logs for error details
-3. Check the browser console for error messages
-4. Verify the `/api/chess-ai` endpoint is responding
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| "All AI providers failed" | No valid keys for any provider | Check admin dashboard, add keys manually, or wait for next Hunter run |
+| High latency (5s+) | Provider under load | System auto-falls back to faster providers; add timeout in game |
+| Move format wrong | AI returned notation your engine can't parse | Normalize the move string (strip spaces, handle "Nf3" vs "g1f3") |
+| CORS error | Game domain not allowed | Update CORS headers in the edge function |
