@@ -32,7 +32,7 @@ app.use('*', cors());
 app.post('/chess-ai', async (c) => {
     try {
         const body = await c.req.json();
-        const { fen, moveHistory } = body;
+        const { fen, moveHistory, difficulty } = body;
 
         if (!fen || typeof fen !== 'string') {
             return c.json({
@@ -45,6 +45,7 @@ app.post('/chess-ai', async (c) => {
         const response = await aiProviderService.getMoveFromAI({
             fen,
             moveHistory,
+            difficulty,
         });
 
         return c.json(response);

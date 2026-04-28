@@ -11,6 +11,7 @@ const PROVIDER_CHAIN = ["Google Gemini", "Grok", "OpenRouter", "Anthropic", "Ope
 interface MoveRequest {
   fen: string;
   moveHistory?: string[];
+  difficulty?: string;
 }
 
 interface MoveResponse {
@@ -86,9 +87,16 @@ class AIProviderService {
     apiKey: string,
     request: MoveRequest
   ): Promise<string> {
-    const systemPrompt = `You are a chess AI engine. Given a FEN position, respond with ONLY the best move in algebraic notation (e.g., "e2e4" or "Nf3"). No explanation, just the move.`;
-
     const userPrompt = `FEN: ${request.fen}\nMove history: ${request.moveHistory?.join(" ") || "none"}\nWhat is the best move?`;
+
+    // Difficulty-aware system prompts
+    const PROMPTS: Record<string, string> = {
+      RECRUIT: `You are a beginner-level chess AI. Given a FEN position, respond with ONLY a move in UCI coordinate notation (e.g., "e2e4", "g1f3"). You should play like a casual player — occasionally make suboptimal moves, miss tactics, and prefer simple piece development. No explanation, just the move.`,
+      SOLDIER: `You are an intermediate chess AI. Given a FEN position, respond with ONLY a move in UCI coordinate notation (e.g., "e2e4", "g1f3"). Play a solid, balanced game — use basic tactics, protect your pieces, and develop normally. Don't play perfectly but don't blunder either. No explanation, just the move.`,
+      COMMANDER: `You are a strong chess AI. Given a FEN position, respond with ONLY a move in UCI coordinate notation (e.g., "e2e4", "g1f3"). Play aggressively and tactically — look for pins, forks, skewers, and sacrifices. Play at a high club level. No explanation, just the move.`,
+      GRANDMASTER: `You are an elite grandmaster-level chess AI. Given a FEN position, respond with ONLY the absolute best move in UCI coordinate notation (e.g., "e2e4", "g1f3"). Evaluate deeply — consider positional advantages, pawn structure, king safety, and long-term plans. Play the strongest possible move. No explanation, just the move.`,
+    };
+    const systemPrompt = PROMPTS[request.difficulty || "GRANDMASTER"] || PROMPTS.GRANDMASTER;
 
     switch (provider) {
       case "OpenAI":
