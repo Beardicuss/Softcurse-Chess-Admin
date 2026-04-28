@@ -17,22 +17,7 @@ export async function createContext(
   try {
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
-    // If not authenticated, grant mock admin in dev mode so you can test features
-    if (!ENV.isProduction) {
-      user = {
-        id: 1,
-        openId: "dev_bypass",
-        name: "Dev Admin",
-        email: "dev@localhost",
-        loginMethod: "local",
-        role: "admin",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        lastSignedIn: new Date()
-      };
-    } else {
-      user = null;
-    }
+    user = null;
   }
 
   return {
