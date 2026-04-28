@@ -115,7 +115,7 @@ export async function validateAllKeys(): Promise<void> {
 }
 
 export function getDefaultCredentialHunterPath(): string {
-  return path.join(process.cwd(), "leaked-api-keys.json");
+  return path.join(process.cwd(), "scripts", "leaked-api-keys.json");
 }
 
 import { fileURLToPath } from "url";
