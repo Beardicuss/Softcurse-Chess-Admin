@@ -14,6 +14,10 @@ import { setCookie } from 'hono/cookie';
 const app = new Hono().basePath('/api');
 
 app.use('*', async (c, next) => {
+    if (c.env) {
+        (globalThis as any).__PAGES_ENV__ = c.env;
+    }
+    // Also try to inject to process for dev parity if it exists playfully
     if (c.env && typeof process !== 'undefined') {
         Object.assign(process.env, c.env);
     }
