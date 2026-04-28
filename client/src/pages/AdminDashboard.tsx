@@ -15,7 +15,8 @@ export default function AdminDashboard() {
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      document.cookie = `app_session_id=${data.token}; Path=/; max-age=31536000; SameSite=Lax; ${window.location.protocol === 'https:' ? 'Secure' : ''}`;
       toast.success("SYSTEM ACCESS GRANTED");
       window.location.reload();
     },

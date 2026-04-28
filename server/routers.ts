@@ -32,7 +32,7 @@ export const appRouter = router({
         const token = await sdk.createSessionToken("local_admin", { name: "System Administrator" });
         const cookieStr = `${COOKIE_NAME}=${token}; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax; Secure`;
         ctx.resHeaders.append('Set-Cookie', cookieStr);
-        return { success: true };
+        return { success: true, token };
       }),
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
