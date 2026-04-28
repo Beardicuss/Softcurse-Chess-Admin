@@ -34,7 +34,7 @@ export default function Home() {
 
         <Link href="/admin/keys">
           <button className="bg-[var(--c-surface)] border border-[var(--c-border)] hover:border-[var(--c-cyan)] hover:text-[var(--c-cyan)] text-[var(--c-text)] font-mono tracking-widest px-8 py-3 uppercase transition-all duration-300 w-full shadow-[0_0_10px_rgba(0,255,255,0.0)] hover:shadow-[0_0_15px_rgba(0,255,255,0.3)] cursor-pointer">
-            [ INIT SECURE OVERRIDE : /ADMIN ]
+            ACCESS ADMIN CORE
           </button>
         </Link>
       </main>

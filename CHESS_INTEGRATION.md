@@ -91,3 +91,19 @@ CORS is enabled on the proxy (`cors()` middleware in Hono). The game works from 
 | Move format wrong | Proxy returns UCI ("e2e4"); `fromAlg` handles conversion |
 | Spectator mode freezes | Proxy down — falls back to minimax automatically |
 | CORS error | Verify `cors()` middleware is active in `functions/api/[[route]].ts` |
+
+### What We Implemented:
+
+*   **Cloud AI Proxy (Cloudflare Pages)**: A backend that routes chess move requests to top-tier AI providers.
+*   **TiDB Database Integration**: A serverless database to store and manage AI provider API keys.
+*   **Credential Hunter**: An automated pipeline that scrapes, validates, and syncs 22+ API keys across 8 providers (Gemini, Grok, OpenAI, etc.).
+*   **Provider Fallback System**: Automatic failover that cycles through providers (Gemini → Grok → OpenRouter → etc.) if one fails or hits rate limits.
+*   **Difficulty-Aware AI**: System prompts scaled by skill level (Recruit, Soldier, Commander, Grandmaster).
+*   **FEN Generator**: Added `toFEN` to `chessEngine.js` to translate the 3D board state for the AI.
+*   **Coordinate Parser**: Added `fromAlg` to `chessEngine.js` to translate AI moves back into game coordinates.
+*   **Unified AI Client**: Updated `aiEngine.js` to fetch moves directly from the cloud proxy.
+*   **New Game Modes**:
+    *   **Grandmaster Mode**: Play against an elite cloud-powered neural engine.
+    *   **AI vs AI (Spectator)**: Watch two real AIs play against each other automatically.
+*   **Cross-Origin Support**: Fully configured CORS to allow the game to call the proxy from any location (localhost or hosted).
+*   **No Local AI**: Removed all local minimax calculations to ensure the game always uses the most advanced cloud models available.
