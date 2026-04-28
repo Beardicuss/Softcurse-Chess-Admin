@@ -9,10 +9,10 @@ export default function Home() {
     <div className="min-h-screen flex flex-col relative items-center justify-center p-6">
       <div className="glow-bloom" />
       <main className="glass-panel p-10 max-w-2xl w-full text-center relative z-10">
-        <h1 className="hero-text mb-4 text-6xl">SOFTCURSE/SYS</h1>
+        <h1 className="hero-text mb-4 text-6xl">SOFTCURSE SYSTEMSS</h1>
         <div className="divider" />
         <h2 className="text-xl font-mono text-[var(--c-cyan-dim)] mb-8 tracking-widest uppercase text-shadow-glow-cyan">
-          Neural Interlink AI Proxy
+          CREDENTIAL HUNTER VAULT
         </h2>
 
         <div className="flex flex-col gap-6 text-left mb-10 px-4">
