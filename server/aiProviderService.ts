@@ -6,7 +6,7 @@
 import { getValidKeysByProvider, getKeysByProvider, logAuditEvent, updateProviderStats } from "./db";
 
 // Provider fallback chain order
-const PROVIDER_CHAIN = ["OpenAI", "Anthropic", "Google Gemini", "xAI", "Mistral", "Cohere"];
+const PROVIDER_CHAIN = ["Google Gemini", "Grok", "OpenRouter", "Anthropic", "OpenAI", "xAI", "Mistral", "Cohere"];
 
 interface MoveRequest {
   fen: string;
@@ -31,7 +31,7 @@ class AIProviderService {
 
       try {
         const move = await this.callProvider(provider, request);
-        
+
         // Log successful usage
         await logAuditEvent("key_used", provider, undefined, {
           fen: request.fen,
@@ -45,7 +45,7 @@ class AIProviderService {
         };
       } catch (error) {
         lastError = error as Error;
-        
+
         // Log fallback event
         await logAuditEvent("fallback_triggered", provider, undefined, {
           reason: (error as Error).message,
@@ -63,7 +63,7 @@ class AIProviderService {
   private async callProvider(provider: string, request: MoveRequest): Promise<string> {
     // Get valid keys for this provider
     const validKeys = await getValidKeysByProvider(provider);
-    
+
     if (validKeys.length === 0) {
       throw new Error(`No valid keys available for ${provider}`);
     }
@@ -87,7 +87,7 @@ class AIProviderService {
     request: MoveRequest
   ): Promise<string> {
     const systemPrompt = `You are a chess AI engine. Given a FEN position, respond with ONLY the best move in algebraic notation (e.g., "e2e4" or "Nf3"). No explanation, just the move.`;
-    
+
     const userPrompt = `FEN: ${request.fen}\nMove history: ${request.moveHistory?.join(" ") || "none"}\nWhat is the best move?`;
 
     switch (provider) {
@@ -99,6 +99,10 @@ class AIProviderService {
         return this.callGoogleGemini(apiKey, systemPrompt, userPrompt);
       case "xAI":
         return this.callXAI(apiKey, systemPrompt, userPrompt);
+      case "Grok":
+        return this.callGrok(apiKey, systemPrompt, userPrompt);
+      case "OpenRouter":
+        return this.callOpenRouter(apiKey, systemPrompt, userPrompt);
       case "Mistral":
         return this.callMistral(apiKey, systemPrompt, userPrompt);
       case "Cohere":
@@ -277,6 +281,62 @@ class AIProviderService {
     const data = (await response.json()) as { generations: Array<{ text: string }> };
     const move = data.generations[0]?.text.trim() || "";
     if (!move) throw new Error("Empty response from Cohere");
+    return move;
+  }
+
+  private async callGrok(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 10,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Grok API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
+    const move = data.choices[0]?.message.content.trim() || "";
+    if (!move) throw new Error("Empty response from Grok");
+    return move;
+  }
+
+  private async callOpenRouter(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.0-flash-001",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.1,
+        max_tokens: 10,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
+    const move = data.choices[0]?.message.content.trim() || "";
+    if (!move) throw new Error("Empty response from OpenRouter");
     return move;
   }
 

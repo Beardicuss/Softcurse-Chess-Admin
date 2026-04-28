@@ -89,7 +89,7 @@ export const appRouter = router({
         if (ctx.user?.role !== "admin") {
           throw new TRPCError({ code: "FORBIDDEN" });
         }
-        const keys = await getValidKeysByProvider(input.provider);
+        const keys = await getKeysByProvider(input.provider);
         return keys.map((k) => ({
           id: k.id,
           provider: k.provider,
